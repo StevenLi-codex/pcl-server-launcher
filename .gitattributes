@@ -2,6 +2,8 @@
 # Set default behavior to automatically normalize line endings.
 ###############################################################################
 * text=auto
+# Preserve this upstream mixed-ending document without whole-file normalization.
+"Plain Craft Launcher 2/Pages/PageOther/PageOtherAbout.xaml" -text
 
 ###############################################################################
 # Set default behavior for command prompt diff.

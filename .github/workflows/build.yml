@@ -1,15 +1,8 @@
 name: Build
 on:
-  push:
-    paths:
-      - 'Plain Craft Launcher 2/**'
-      - '.github/workflows/**'
-  pull_request:
-    paths:
-      - 'Plain Craft Launcher 2/**'
-      - '.github/workflows/**'
   workflow_dispatch:
-
+permissions:
+  contents: read
 jobs:
   build:
     name: Build

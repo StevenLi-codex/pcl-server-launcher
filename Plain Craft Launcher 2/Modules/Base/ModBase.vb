@@ -15,7 +15,7 @@ Public Module ModBase
 #End If
 
     '版本信息
-    Public Const VersionDisplay As String = BuildTypeDisplay & " " & VersionBaseName
+    Public Const VersionDisplay As String = BuildTypeDisplay & " " & VersionBaseName & " · Steven 服务器修改版 0.1-test"
 #If DEBUG Then
     Public Const BuildTypeDisplay As String = "开发版"
     Public Const BuildType As BuildTypes = BuildTypes.Debug

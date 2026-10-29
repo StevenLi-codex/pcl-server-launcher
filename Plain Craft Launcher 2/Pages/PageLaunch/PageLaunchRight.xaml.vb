@@ -4,6 +4,7 @@ Public Class PageLaunchRight
     Implements IRefreshable, IDispatcherUnhandledException
 
     Private Sub Init() Handles Me.Loaded
+        PanServers.EnsureInitialized()
         PanBack.ScrollToHome()
         PanLog.Visibility = ModeDebug.ToVisibility
         '快照版提示

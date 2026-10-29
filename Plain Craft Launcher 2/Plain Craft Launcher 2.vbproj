@@ -921,6 +921,10 @@
       <Project>{2dffe2a0-1101-816b-d240-f644b2d74a68}</Project>
       <Name>MeloongCore.Wpf</Name>
     </ProjectReference>
+    <ProjectReference Include="..\ServerPack.Core\ServerPack.Core.csproj">
+      <Name>ServerPack.Core</Name>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\PCLCS\PCLCS.csproj">
       <Project>{32de4aaf-f4d6-42c5-9604-19236de96c69}</Project>
       <Name>PCLCS</Name>
@@ -949,6 +953,14 @@
     <Resource Include="Images\Heads\ChongQing.png" />
     <Resource Include="Images\Heads\HerobrineXia.png" />
 
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Modules\ModServerPack.vb" />
+    <Compile Include="Pages\PageLaunch\ServerPackPanel.vb" />
+    <Content Include="..\serverpack\catalog.json">
+      <Link>serverpack\catalog.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>

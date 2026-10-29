@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "servers": [
+    {
+      "Id": "twilight",
+      "Name": "暮色森林",
+      "Address": "twilight.220719.uk",
+      "Version": "2026-10-26.1",
+      "PackUrl": "https://mc-download.220719.uk/twilight-2026-10-26.1.mrpack",
+      "PackSha256": "29804e417ae8f036e8b8208f704c2188d338974f5b929a0d3534a742c51ca1f7"
+    },
+    {
+      "Id": "pokemon",
+      "Name": "宝可梦",
+      "Address": "pokemon.220719.uk",
+      "Version": "2026-10-25.2",
+      "PackUrl": "https://mc-download.220719.uk/pokemon-2026-10-25.2.mrpack",
+      "PackSha256": "678a54dd9753548aefd1f4c3c7742c6856b5f7aac81e04fd9d75715923ba36f8"
+    },
+    {
+      "Id": "skyblock",
+      "Name": "九选一空岛",
+      "Address": "skyblock.220719.uk",
+      "Version": "2026-10-25.2",
+      "PackUrl": "https://mc-download.220719.uk/skyblock-2026-10-25.2.mrpack",
+      "PackSha256": "85de22cb08c9aa28fdf9f53d38d0c6dd937510e07eabdcb6769048f3a6947fe5"
+    },
+    {
+      "Id": "survival",
+      "Name": "原版生存",
+      "Address": "survival.220719.uk",
+      "Version": "2026-10-25.2",
+      "PackUrl": "https://mc-download.220719.uk/survival-2026-10-25.2.mrpack",
+      "PackSha256": "09d999176a4869e2c4cd40124d3d99460737c824a80666f14c3d3cbaf0a5f53b"
+    }
+  ]
+}
