@@ -1,0 +1,72 @@
+name: Server Edition Windows Build
+on:
+  workflow_dispatch:
+  push:
+    branches: [server-edition]
+    paths:
+      - 'Plain Craft Launcher 2/**'
+      - 'PCLCS/**'
+      - 'ServerPack.Core/**'
+      - 'ServerPack.Tests/**'
+      - 'serverpack/**'
+      - '.github/workflows/server-edition.yml'
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
+      - name: Embedded pack behavior tests
+        shell: pwsh
+        run: |
+          if (Test-Path 'ServerPack.Tests/ServerPack.Tests.csproj') {
+            dotnet run --project ServerPack.Tests/ServerPack.Tests.csproj --configuration Release
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Restore and build Windows launcher
+        shell: pwsh
+        run: |
+          dotnet restore PCLCS/PCLCS.csproj
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Test-Path 'ServerPack.Core/ServerPack.Core.csproj') {
+            dotnet restore ServerPack.Core/ServerPack.Core.csproj
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          msbuild 'Plain Craft Launcher 2/Plain Craft Launcher 2.vbproj' /m /p:Configuration=Release /p:Platform=AnyCPU /verbosity:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package compiled launcher and notices
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/app | Out-Null
+          Copy-Item 'Plain Craft Launcher 2/bin/*' dist/app/ -Recurse -Force
+          Copy-Item LICENCE dist/app/LICENCE
+          Copy-Item README.md dist/app/README.md
+          Copy-Item MeloongCore/LICENSE.txt dist/app/MeloongCore-LICENSE.txt
+          if (Test-Path serverpack) { Copy-Item serverpack dist/app/serverpack -Recurse }
+          if (Test-Path SERVER-EDITION.md) { Copy-Item SERVER-EDITION.md dist/app/SERVER-EDITION.md }
+          $exe = Join-Path $PWD 'dist/app/Plain Craft Launcher 2.exe'
+          if (-not (Test-Path $exe)) { throw 'Compiled launcher executable missing' }
+          $assembly = [Reflection.AssemblyName]::GetAssemblyName($exe)
+          Write-Host "Compiled assembly: $($assembly.FullName)"
+          Compress-Archive -Path dist/app/* -DestinationPath dist/PCL-Server-Edition-test.zip
+          $hash = (Get-FileHash dist/PCL-Server-Edition-test.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  PCL-Server-Edition-test.zip" | Set-Content dist/SHA256SUMS -Encoding utf8
+      - uses: actions/upload-artifact@v7
+        with:
+          name: PCL-Server-Edition-Windows-test
+          path: |
+            dist/PCL-Server-Edition-test.zip
+            dist/SHA256SUMS
+          retention-days: 14
+          if-no-files-found: error
