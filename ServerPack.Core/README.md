@@ -29,7 +29,7 @@ This protects against ordinary errors/process interruption, not hostile simultan
 ## Verification
 
 ```
-/home/steven/.hermes/cache/scratch/pcl-dotnet/dotnet run --project ServerPack.Tests
+dotnet run --project ServerPack.Tests
 ```
 
 Tests are a net9.0 console harness referencing this library, with real temporary files. Synthetic byte fixtures are explicitly labeled. `PCL_PACK_INTAKE` enables the four previously downloaded real pinned archive fixtures (`reports.json` + mrpacks); `PCL_LIVE_CATALOG` enables real HTTPS archive preparation from a catalog file. Symlink cases require an OS/account allowed to create symlinks. No production server/site writes are made.

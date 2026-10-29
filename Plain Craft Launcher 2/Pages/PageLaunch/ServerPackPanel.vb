@@ -173,6 +173,42 @@ Public Class ServerPackPanel
         If Not String.Equals(instance.PathIndie.TrimEnd("\"c), instance.PathVersion.TrimEnd("\"c), StringComparison.OrdinalIgnoreCase) Then Throw New InvalidOperationException("此实例未启用版本隔离。请先在 PCL 版本设置中开启版本隔离，避免影响其他游戏。")
     End Sub
 
+    Private Async Function RollbackLocalInstanceAsync(row As ServerRow, folder As String) As Task
+        row.Status.Text = "正在检查本地恢复记录……"
+        Dim candidates = Await Task.Run(Function() FindLocalRollbackRoots(folder, row.Server.Id))
+        EnsureSameMinecraftFolder(folder)
+        If candidates.Count = 0 Then Throw New InvalidOperationException("此服务器没有可安全识别的本地回滚记录；不会接管其他版本。")
+        Dim index As Integer = 0
+        If candidates.Count > 1 Then
+            Dim choices = candidates.Select(Function(candidate) CType(New MyRadioBox With {.Text = Path.GetFileName(candidate)}, IMyRadio)).ToList()
+            Dim selected = MyMsgBoxSelect(choices, "选择要回滚的本地服务器实例", "选择", "取消")
+            If Not selected.HasValue Then
+                row.Status.Text = "已取消回滚。"
+                Return
+            End If
+            index = selected.Value
+            If index < 0 OrElse index >= candidates.Count Then Throw New InvalidOperationException("实例选择无效。")
+        End If
+        Dim root = candidates(index)
+        If MyMsgBox(row.Server.Name & vbCrLf & "将使用本地备份恢复上次同步或中断的更新。不下载当前整合包，不切换 Minecraft / 加载器，不覆盖个人目录；不会自动启动。" & vbCrLf & root,
+                    "确认回滚", "回滚", "取消") <> 1 Then
+            row.Status.Text = "已取消回滚。"
+            Return
+        End If
+        EnsureSameMinecraftFolder(folder)
+        Await RunLockedServerMutationAsync(root,
+            Sub()
+                EnsureSameMinecraftFolder(folder)
+                If Not FindLocalRollbackRoots(folder, row.Server.Id).Contains(root, StringComparer.Ordinal) Then Throw New InvalidOperationException("本地恢复记录已改变，操作已停止。")
+                ' Core validates journal paths, backup hashes and user edits, including pending recovery.
+                PackService.RollbackLast(root)
+            End Sub)
+        row.Prepared = Nothing
+        row.InstanceRoot = root
+        McInstanceListForceRefresh = True
+        row.Status.Text = "已回滚本地实例。再次启动前会检查当前服务器要求的版本。"
+    End Function
+
     Private Async Sub ExecuteServerAction(row As ServerRow, action As ServerAction)
         If LoadingCatalog OrElse Not TryBeginServerOperation() Then Return
         SetButtons(False)
@@ -184,8 +220,12 @@ Public Class ServerPackPanel
         If launchControls IsNot Nothing Then launchControls.IsEnabled = False
         Dim root As String = Nothing
         Try
-            ValidateServer(server)
             AssertNoGameActive()
+            If action = ServerAction.Rollback Then
+                Await RollbackLocalInstanceAsync(row, folder)
+                Return
+            End If
+            ValidateServer(server)
             If action = ServerAction.Launch AndAlso String.IsNullOrWhiteSpace(OAuthClientId) Then Throw New InvalidOperationException("微软登录缺少应用 ID。请设置你自己的 PCL_MS_CLIENT_ID 环境变量后重新打开启动器，并在左侧登录正版账号。不会自动切换到离线登录。")
             row.Status.Text = "正在下载并验证整合包……"
             ' Preparation performs network / archive work on a worker, never the WPF thread.
@@ -233,24 +273,6 @@ Public Class ServerPackPanel
             End If
 
             RequireManaged(root, prepared)
-            If action = ServerAction.Rollback Then
-                If MyMsgBox(server.Name & vbCrLf & "将恢复此实例上一次同步前的受管文件。仅回滚上一次更新，不切换 Minecraft / 加载器，不覆盖个人目录；不会自动启动。" & vbCrLf & root,
-                            "确认回滚", "回滚", "取消") <> 1 Then
-                    row.Status.Text = "已取消回滚。"
-                    Return
-                End If
-                EnsureSameMinecraftFolder(folder)
-                Await RunLockedServerMutationAsync(root,
-                    Sub()
-                        EnsureSameMinecraftFolder(folder)
-                        RequireManaged(root, prepared)
-                        PackService.RollbackLast(root)
-                    End Sub)
-                row.Prepared = Nothing
-                row.Status.Text = "已回滚上次同步。再次启动前会检查当前服务器要求的版本。"
-                Return
-            End If
-
             row.Status.Text = "正在核对受管文件……"
             Dim plan = Await Task.Run(Function() PackService.Plan(root, prepared))
             Dim changed = plan.AddCount <> 0 OrElse plan.ReplaceCount <> 0 OrElse plan.RemoveCount <> 0

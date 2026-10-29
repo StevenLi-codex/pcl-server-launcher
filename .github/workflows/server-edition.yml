@@ -8,6 +8,8 @@ on:
       - 'PCLCS/**'
       - 'ServerPack.Core/**'
       - 'ServerPack.Tests/**'
+      - 'ServerPack.UiTests/**'
+      - 'scripts/**'
       - 'serverpack/**'
       - '.github/workflows/server-edition.yml'
 permissions:
@@ -34,6 +36,10 @@ jobs:
             dotnet run --project ServerPack.Tests/ServerPack.Tests.csproj --configuration Release
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+          if (Test-Path 'ServerPack.UiTests/ServerPack.UiTests.vbproj') {
+            dotnet run --project ServerPack.UiTests/ServerPack.UiTests.vbproj --configuration Release
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
       - name: Restore and build Windows launcher
         shell: pwsh
         run: |
@@ -53,8 +59,10 @@ jobs:
           Copy-Item LICENCE dist/app/LICENCE
           Copy-Item README.md dist/app/README.md
           Copy-Item MeloongCore/LICENSE.txt dist/app/MeloongCore-LICENSE.txt
-          if (Test-Path serverpack) { Copy-Item serverpack dist/app/serverpack -Recurse }
+          New-Item -ItemType Directory -Force dist/app/serverpack | Out-Null
+          Copy-Item serverpack/catalog.json dist/app/serverpack/catalog.json -Force
           if (Test-Path SERVER-EDITION.md) { Copy-Item SERVER-EDITION.md dist/app/SERVER-EDITION.md }
+          if (Test-Path VERIFICATION.md) { Copy-Item VERIFICATION.md dist/app/VERIFICATION.md }
           $exe = Join-Path $PWD 'dist/app/Plain Craft Launcher 2.exe'
           if (-not (Test-Path $exe)) { throw 'Compiled launcher executable missing' }
           $assembly = [Reflection.AssemblyName]::GetAssemblyName($exe)

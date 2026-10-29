@@ -189,6 +189,74 @@ Public Module ModServerPack
         Return target
     End Function
 
+    ' Local discovery only: no catalog version, archive download, or IsManaged gate.
+    ' The dependency-derived full name disambiguates IDs whose prefixes overlap.
+    Public Function FindLocalRollbackRoots(minecraftRoot As String, serverId As String) As IList(Of String)
+        ValidateId(serverId)
+        If String.IsNullOrWhiteSpace(minecraftRoot) OrElse Not Path.IsPathRooted(minecraftRoot) Then Throw New InvalidDataException("请先选择有效的 Minecraft 文件夹。")
+        Dim versions = Path.GetFullPath(Path.Combine(minecraftRoot, "versions"))
+        AssertNoReparseAncestors(versions)
+        Dim result As New List(Of String)
+        If Not Directory.Exists(versions) Then Return result
+        Dim prefix = "PCL-Server-" & serverId & "-"
+        For Each root In Directory.EnumerateDirectories(versions, "*", SearchOption.TopDirectoryOnly)
+            Dim name = Path.GetFileName(root)
+            If Not name.StartsWith(prefix, StringComparison.Ordinal) Then Continue For
+            Try
+                AssertNoReparseAncestors(root)
+                Dim meta = Path.Combine(root, ".pcl-server-pack")
+                Dim statePath = Path.Combine(meta, "state.json")
+                AssertNoReparseAncestors(statePath)
+                Dim pending = Path.Combine(meta, "pending.json")
+                Dim last = Path.Combine(meta, "last.json")
+                AssertNoReparseAncestors(pending)
+                AssertNoReparseAncestors(last)
+                Dim pointer = If(File.Exists(pending), pending, last)
+                If Not File.Exists(pointer) OrElse New FileInfo(pointer).Length <> 32 Then Continue For
+                Dim id = File.ReadAllText(pointer)
+                If Not Regex.IsMatch(id, "\A[0-9a-fA-F]{32}\z", RegexOptions.CultureInvariant) Then Continue For
+                Dim journal = ReadLocalRollbackMetadata(Path.Combine(meta, "tx-" & id, "transaction.json"), 16 * 1024 * 1024)
+                If journal("Id") Is Nothing OrElse journal("Id").Type <> JTokenType.String OrElse journal.Value(Of String)("Id") <> id OrElse Not TypeOf journal("Changes") Is JArray Then Continue For
+                Dim dependency = LocalRollbackDependency(TryCast(journal("Before"), JObject))
+                If Not LocalRollbackNameMatches(name, serverId, dependency) OrElse LocalRollbackDependency(TryCast(journal("After"), JObject)) <> dependency Then Continue For
+                If File.Exists(statePath) Then
+                    If LocalRollbackDependency(ReadLocalRollbackMetadata(statePath, 8 * 1024 * 1024)) <> dependency Then Continue For
+                ElseIf Not File.Exists(pending) Then
+                    Continue For
+                End If
+                result.Add(root)
+            Catch ex As Exception When TypeOf ex Is IOException OrElse TypeOf ex Is InvalidDataException OrElse TypeOf ex Is UnauthorizedAccessException OrElse TypeOf ex Is JsonException OrElse TypeOf ex Is ArgumentException
+                ' Malformed, unowned or linked candidates are never taken over.
+            End Try
+        Next
+        result.Sort(StringComparer.Ordinal)
+        Return result
+    End Function
+
+    Private Function ReadLocalRollbackMetadata(file As String, limit As Integer) As JObject
+        AssertNoReparseAncestors(file)
+        Using stream As New FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read)
+            If stream.Length > limit Then Throw New InvalidDataException("本地恢复元数据过大。")
+            Using text As New StreamReader(stream, New UTF8Encoding(False, True))
+                Using reader As New JsonTextReader(text) With {.MaxDepth = 32, .DateParseHandling = DateParseHandling.None}
+                    Dim result = JObject.Load(reader, New JsonLoadSettings With {.DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error})
+                    If reader.Read() Then Throw New InvalidDataException("本地恢复元数据尾部存在额外内容。")
+                    Return result
+                End Using
+            End Using
+        End Using
+    End Function
+
+    Private Function LocalRollbackDependency(state As JObject) As String
+        If state Is Nothing OrElse state("Format") Is Nothing OrElse state("Format").Type <> JTokenType.Integer OrElse state("Format").ToString(Formatting.None) <> "1" OrElse Not TypeOf state("Files") Is JObject OrElse state("DependencyKey") Is Nothing OrElse state("DependencyKey").Type <> JTokenType.String Then Throw New InvalidDataException("本地恢复状态无效。")
+        Return state.Value(Of String)("DependencyKey")
+    End Function
+
+    Private Function LocalRollbackNameMatches(name As String, serverId As String, dependency As String) As Boolean
+        Dim matches = dependency.Split(";"c).Where(Function(p) p.StartsWith("minecraft=", StringComparison.Ordinal)).ToArray()
+        Return matches.Length = 1 AndAlso String.Equals(name, GetInstanceName(serverId, matches(0).Substring(10), dependency), StringComparison.Ordinal)
+    End Function
+
     Public Sub AssertNoReparseAncestors(target As String)
         Dim current As New DirectoryInfo(Path.GetFullPath(target))
         Do While current IsNot Nothing
